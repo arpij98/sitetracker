@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SiteTracker — Never Miss an Order</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#171717; --card:#1e1e1e; --ink:#f5f5f5; --muted:#9ca3af;
+    --brand:#ffffff; --brand2:#525252; --line:#2e2e2e;
+    --red:#f87171; --amber:#fbbf24; --green:#4ade80; --gray:#9ca3af;
+    --blue-tint:rgba(255,255,255,.10); --red-tint:rgba(248,113,113,.14); --green-tint:rgba(74,222,128,.12); --amber-tint:rgba(251,191,36,.12); --gray-tint:rgba(255,255,255,.06);
+    --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;font-family:'Inter',-apple-system,'Segoe UI','Noto Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:15px;letter-spacing:-.01em}
+  button{font-family:inherit}
+  /* ---------- layout ---------- */
+  #topbar{position:fixed;top:0;left:0;right:0;height:54px;background:var(--bg);color:var(--ink);display:flex;align-items:center;padding:0 14px;z-index:1200;gap:10px;border-bottom:1px solid var(--line)}
+  #topbar .logo{font-weight:800;font-size:19px;letter-spacing:-.03em;color:#8a8a8a}
+  #topbar .logo span{color:#fff}
+  #topbar .sub{font-size:11px;color:var(--muted)}
+  #hotCount{margin-left:auto;background:var(--red-tint);color:var(--red);border:none;border-radius:20px;padding:7px 14px;font-weight:500;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px}
+  #hotCount .dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite}
+  main{position:absolute;top:54px;bottom:58px;left:0;right:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  main.no-scroll{overflow:hidden}
+  #nav{position:fixed;bottom:0;left:0;right:0;height:58px;background:var(--bg);border-top:1px solid var(--line);display:flex;z-index:1200}
+  #nav button{flex:1;border:none;background:none;color:var(--muted);font-size:11px;font-weight:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer}
+  #nav button.active{color:var(--brand)}
+  #nav .ico{font-size:19px;line-height:1;padding:3px 16px;border-radius:16px;transition:background .15s}
+  #nav button.active .ico{background:var(--blue-tint)}
+  .page{display:none;padding:14px;max-width:900px;margin:0 auto}
+  .page.active{display:block}
+  #page-map{padding:0;max-width:none;height:100%}
+  #map{height:100%;width:100%}
+  /* ---------- cards & general ---------- */
+  .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--line);box-shadow:none;padding:14px;margin-bottom:12px}
+  h2{font-size:16px;margin:0 0 10px;font-weight:600;letter-spacing:-.02em}
+  h3{font-size:12px;margin:16px 0 8px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1}
+  .btn{border:none;border-radius:22px;padding:10px 20px;font-weight:600;font-size:14px;cursor:pointer;background:#fff;color:#111;transition:opacity .15s}
+  .btn:hover{opacity:.85}
+  .btn.sec{background:#262626;color:#f5f5f5;border:1px solid var(--line)}
+  .btn.danger{background:var(--red-tint);color:var(--red)}
+  .btn.small{padding:6px 10px;font-size:12px}
+  .btn:disabled{opacity:.5}
+  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;background:#202020;color:var(--ink);outline:none}
+  input:focus,select:focus,textarea:focus{border-color:#666;box-shadow:0 0 0 1px #666}
+  input::placeholder,textarea::placeholder{color:#6b7280}
+  #siteSearch{background:#232323;border:1px solid var(--line);border-radius:24px;padding:12px 18px}
+  #siteSearch:focus{border-color:#666}
+  textarea{resize:vertical;min-height:64px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:10px 0 4px}
+  .pill{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500}
+  .pill.hot{background:var(--red-tint);color:var(--red)}
+  .pill.warm{background:var(--amber-tint);color:var(--amber)}
+  .pill.ok{background:var(--green-tint);color:var(--green)}
+  .pill.done{background:var(--gray-tint);color:var(--gray)}
+  .muted{color:var(--muted);font-size:12px}
+  .empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px}
+  /* ---------- site list ---------- */
+  .site-item{display:flex;gap:10px;align-items:flex-start;padding:12px;border-bottom:1px solid var(--line);cursor:pointer}
+  .site-item:last-child{border-bottom:none}
+  .site-item:hover{background:var(--gray-tint)}
+  .status-dot{width:14px;height:14px;border-radius:50%;margin-top:3px;flex-shrink:0}
+  .status-dot.hot{background:var(--red);animation:pulse 1.2s infinite}
+  .status-dot.warm{background:var(--amber)}
+  .status-dot.ok{background:var(--green)}
+  .status-dot.done{background:var(--gray)}
+  .site-item .name{font-weight:500;font-size:15px}
+  .site-item .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .site-item .need{font-size:12px;color:var(--red);font-weight:600;margin-top:3px}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(217,48,37,.5)}70%{box-shadow:0 0 0 10px rgba(217,48,37,0)}100%{box-shadow:0 0 0 0 rgba(217,48,37,0)}}
+  /* ---------- map markers ---------- */
+  .mk{width:18px;height:18px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .mk.hot{background:var(--red);animation:pulse 1.2s infinite}
+  .mk.warm{background:var(--amber)}
+  .mk.ok{background:var(--green)}
+  .mk.done{background:var(--gray)}
+  .leaflet-popup-content{margin:10px 14px;min-width:190px}
+  .leaflet-popup-content .pname{font-weight:800;font-size:14px;margin-bottom:2px}
+  #mapLegend{position:absolute;bottom:14px;left:10px;z-index:1000;background:rgba(23,23,23,.92);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:11px;box-shadow:var(--shadow)}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#1e1e1e;color:var(--ink)}
+  .leaflet-container{background:#171717}
+  #mapLegend .li{display:flex;align-items:center;gap:6px;margin:3px 0}
+  #mapLegend .d{width:10px;height:10px;border-radius:50%}
+  #mapBtns{position:absolute;top:10px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+  #mapBtns .btn{box-shadow:var(--shadow)}
+  /* ---------- detail ---------- */
+  .stage-track{display:flex;gap:4px;overflow-x:auto;padding:6px 0}
+  .stage-chip{flex-shrink:0;padding:7px 12px;border-radius:8px;font-size:11px;font-weight:500;background:var(--gray-tint);color:var(--muted);border:1px solid transparent;cursor:pointer}
+  .stage-chip.past{background:var(--green-tint);color:var(--green)}
+  .stage-chip.now{background:#fff;color:#111}
+  .mat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .mat-cell{border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
+  .mat-cell .mn{font-size:12px;font-weight:500}
+  .mat-cell .ms{font-size:11px;font-weight:700;margin-top:4px}
+  .mat-cell.st-open{border-color:var(--red);background:var(--red-tint)}.mat-cell.st-open .ms{color:var(--red)}
+  .mat-cell.st-quoted{border-color:var(--amber);background:var(--amber-tint)}.mat-cell.st-quoted .ms{color:var(--amber)}
+  .mat-cell.st-won{border-color:var(--green);background:var(--green-tint)}.mat-cell.st-won .ms{color:var(--green)}
+  .mat-cell.st-lost{border-color:var(--line);background:var(--gray-tint)}.mat-cell.st-lost .ms{color:var(--gray)}
+  .mat-cell.st-na .ms{color:var(--muted)}
+  .mat-cell .mb{font-size:11px;color:var(--muted);margin-top:2px;min-height:13px}
+  .mat-cell select{padding:7px 8px;font-size:13px;margin-top:5px;border-radius:8px;background:#202020}
+  .visit{border-left:3px solid var(--brand2);padding:8px 10px;margin-bottom:8px;background:var(--gray-tint);border-radius:0 8px 8px 0}
+  .visit .vd{font-size:12px;font-weight:700}
+  .visit .vn{font-size:13px;margin-top:2px;white-space:pre-wrap}
+  .contact{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);gap:8px}
+  .contact:last-child{border:none}
+  .contact a{color:var(--brand);text-decoration:none;font-weight:700}
+  /* ---------- dashboard ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px}
+  .kpi{background:var(--card);border-radius:var(--radius);border:1px solid var(--line);padding:14px;text-align:center}
+  .kpi .n{font-size:26px;font-weight:400}
+  .kpi .l{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+  .kpi.hot .n{color:var(--red)} .kpi.warm .n{color:var(--amber)} .kpi.ok .n{color:var(--green)}
+  .bar{height:9px;background:rgba(255,255,255,.3);border-radius:6px;overflow:hidden;margin-top:6px}
+  .bar>div{height:100%;background:#fff;border-radius:6px}
+  .lb{width:100%;border-collapse:collapse;font-size:13px}
+  .lb th{font-size:11px;color:var(--muted);text-transform:uppercase;text-align:left}
+  .lb td,.lb th{padding:7px 8px;border-bottom:1px solid var(--line)}
+  .lb tr:last-child td{border:none}
+  .insight{padding:9px 12px;border-left:3px solid var(--brand2);background:rgba(255,255,255,.05);border-radius:0 8px 8px 0;margin:7px 0;font-size:13px;font-weight:500}
+  .insight.bad{border-color:var(--red);background:var(--red-tint)}
+  .insight.good{border-color:var(--green);background:var(--green-tint)}
+  .levelcard{background:#fff;color:#111;border-radius:18px;padding:18px;margin-bottom:12px}
+  .levelcard .big{font-size:22px;font-weight:800;letter-spacing:-.03em}
+  .levelcard .muted{color:rgba(0,0,0,.55)}
+  .levelcard .bar{background:rgba(0,0,0,.12)}
+  .levelcard .bar>div{background:#111}
+  /* ---------- modal ---------- */
+  #modal{display:none;position:fixed;inset:0;background:rgba(10,20,40,.5);z-index:2000;align-items:flex-end;justify-content:center}
+  #modal.open{display:flex}
+  #modalBox{background:#1a1a1a;border:1px solid var(--line);border-radius:28px 28px 0 0;width:100%;max-width:700px;max-height:92%;overflow-y:auto;padding:10px 16px 30px}
+  #modalBox::before{content:'';display:block;width:32px;height:4px;border-radius:2px;background:#3a3a3a;margin:4px auto 8px}
+  @media(min-width:700px){#modal{align-items:center}#modalBox{border-radius:28px;max-height:88%}}
+  #modalBox .mhead{display:flex;justify-content:space-between;align-items:center;position:sticky;top:-10px;background:#1a1a1a;padding:6px 0;z-index:5}
+  .close-x{border:none;background:#2a2a2a;border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;font-weight:500;color:#d4d4d4}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  @media(max-width:520px){.form-grid{grid-template-columns:1fr}}
+  .gps-status{font-size:12px;margin-top:6px;font-weight:600}
+  #miniMap{height:220px;border-radius:10px;margin-top:8px;border:1px solid var(--line)}
+  .searchbar{position:sticky;top:0;background:var(--bg);padding:2px 0 10px;z-index:10}
+  .toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:#fff;color:#111;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:3000;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+  .toast.show{opacity:1}
+  /* ---------- auth ---------- */
+  #auth{position:fixed;inset:0;background:#111;z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px}
+  #authBox{background:#1c1c1c;border:1px solid var(--line);border-radius:20px;padding:26px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+  #authBox h1{font-size:22px;margin:0 0 4px;font-weight:800;letter-spacing:-.03em}
+  #authBox .tag{font-size:12px;color:var(--muted);margin-bottom:16px}
+  #authBox input{margin-bottom:10px}
+  .pin-input{font-size:22px !important;letter-spacing:6px;text-align:center;font-weight:700}
+  .auth-err{color:var(--red);font-size:13px;font-weight:700;min-height:18px;margin-bottom:6px}
+  .lock-note{font-size:11px;color:var(--muted);margin-top:12px;line-height:1.5}
+  #lockBtn{background:var(--gray-tint);border:none;color:var(--muted);border-radius:50%;width:36px;height:36px;font-size:15px;cursor:pointer}
+  .rec{background:var(--red-tint) !important;color:var(--red) !important;animation:pulse 1.2s infinite}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div>
+    <div class="logo">Site<span>Tracker</span></div>
+    <div class="sub" id="subTitle">Never miss an order</div>
+  </div>
+  <button id="hotCount" onclick="showTab('sites');filterMode='hot';renderSites()"><span class="dot"></span><span id="hotN">0</span> HOT</button>
+  <button id="lockBtn" title="Lock app" onclick="lockApp()">🔒</button>
+</div>
+
+<div id="auth"><div id="authBox"></div></div>
+
+<main id="main">
+  <div class="page" id="page-map"><div id="map"></div>
+    <div id="mapLegend">
+      <div class="li"><span class="d" style="background:var(--red)"></span> Active need — approach NOW</div>
+      <div class="li"><span class="d" style="background:var(--amber)"></span> Upcoming need / follow-up soon</div>
+      <div class="li"><span class="d" style="background:var(--green)"></span> Covered for current stage</div>
+      <div class="li"><span class="d" style="background:var(--gray)"></span> Completed / inactive</div>
+    </div>
+    <div id="mapBtns">
+      <button class="btn small" onclick="locateMe()">📍 My location</button>
+      <button class="btn small sec" onclick="fitAllSites()">🔍 All sites</button>
+    </div>
+  </div>
+
+  <div class="page" id="page-sites">
+    <div class="searchbar row">
+      <input class="grow" id="siteSearch" placeholder="Search site, builder, contact, brand…" oninput="renderSites()">
+      <select id="siteFilter" style="width:auto" onchange="filterMode=this.value;renderSites()">
+        <option value="all">All</option><option value="hot">🔴 Hot</option><option value="warm">🟠 Upcoming</option>
+        <option value="ok">🟢 Covered</option><option value="overdue">⏰ Overdue follow-up</option><option value="done">Completed</option>
+      </select>
+      <select id="execFilter" style="width:auto;display:none" onchange="renderSites()"></select>
+    </div>
+    <div class="card" id="siteList" style="padding:0"></div>
+  </div>
+
+  <div class="page" id="page-dash"><div id="dashContent"></div></div>
+
+  <div class="page" id="page-add"><div id="addFormWrap"></div></div>
+
+  <div class="page" id="page-data">
+    <div class="card">
+      <h2>Your name (for visit logs)</h2>
+      <input id="execName" placeholder="e.g. Rahul Sharma" onchange="S.settings.execName=this.value;save()">
+      <div class="muted" style="margin-top:6px">Every visit you log is stamped with this name — so when executives change, history stays.</div>
+    </div>
+    <div class="card">
+      <h2>🔐 Security</h2>
+      <p class="muted">All data on this device is AES-256 encrypted with your PIN. Backup files are encrypted with a passphrase — a leaked file is unreadable without it. Lock the app with the 🔒 button whenever you hand the phone to anyone.</p>
+      <div class="row"><button class="btn sec" onclick="changePIN()">Change my PIN</button><button class="btn sec" onclick="lockApp()">🔒 Lock now</button></div>
+    </div>
+    <div class="card">
+      <h2>Backup & handover</h2>
+      <p class="muted">Export an encrypted backup after every field day and send it to the owner/admin — he imports every executive's file to see the full picture. When an executive leaves, their last backup means zero knowledge is lost. Share the passphrase by phone call, never alongside the file.</p>
+      <div class="row">
+        <button class="btn" onclick="exportJSON()">⬇ Export backup (JSON)</button>
+        <button class="btn sec" onclick="document.getElementById('importFile').click()">⬆ Import / merge backup</button>
+        <input type="file" id="importFile" accept=".json,.stbak" style="display:none" onchange="importJSON(this)">
+        <button class="btn sec" onclick="exportCSV()">📊 Export sites as CSV (Excel)</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Demo & reset</h2>
+      <div class="row">
+        <button class="btn sec" onclick="loadSample()">Load sample sites (demo)</button>
+        <button class="btn danger" onclick="wipeAll()">Delete ALL data</button>
+      </div>
+    </div>
+    <div class="card muted">
+      <b>How alerts work:</b> each construction stage consumes specific materials. If a site's current stage needs a material you haven't yet WON (or marked lost/N-A), the site turns <b style="color:var(--red)">red and pulses</b> on the map — an order is being placed by someone right now. Amber = the next stage's needs are coming up, or a follow-up is due within 7 days. Overdue follow-ups also turn red.
+    </div>
+  </div>
+</main>
+
+<div id="nav">
+  <button data-tab="map" class="active" onclick="showTab('map')"><span class="ico">🗺️</span>Map</button>
+  <button data-tab="sites" onclick="showTab('sites')"><span class="ico">🏗️</span>Sites</button>
+  <button data-tab="add" onclick="openAddForm()"><span class="ico">➕</span>Add Site</button>
+  <button data-tab="dash" onclick="showTab('dash')"><span class="ico">📈</span>Dashboard</button>
+  <button data-tab="data" onclick="showTab('data')"><span class="ico">⚙️</span>Data</button>
+</div>
+
+<div id="modal"><div id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* ================= DATA MODEL ================= */
+const STAGES = [
+  {k:'plan',    n:'Approvals / Pre-construction', mats:[]},
+  {k:'found',   n:'Excavation & Foundation',      mats:['cement','steel','waterproof']},
+  {k:'struct',  n:'Structure (RCC frame)',        mats:['cement','steel','blocks']},
+  {k:'masonry', n:'Masonry & Plastering',         mats:['blocks','cement']},
+  {k:'mep',     n:'Electrical & Plumbing rough-in',mats:['epipes','ewires','plumbing']},
+  {k:'floorprep',n:'Waterproofing & Floor prep',  mats:['waterproof','adhesive','tiles']},
+  {k:'tiling',  n:'Flooring & Tiling',            mats:['tiles','adhesive']},
+  {k:'paint',   n:'Painting',                     mats:['paint']},
+  {k:'fittings',n:'Fittings & Sanitary',          mats:['sanitary','sink','eproducts','hardware']},
+  {k:'done',    n:'Handover / Completed',         mats:[]}
+];
+const MATS = {
+  cement:'Cement & RMC', steel:'TMT Steel', blocks:'Blocks & Bricks',
+  waterproof:'Waterproofing', adhesive:'Tile Adhesive', tiles:'Tiles',
+  plumbing:'Plumbing', epipes:'Electrical Pipes', ewires:'Electrical Wires', eproducts:'Electrical Products',
+  paint:'Paints & Putty', sanitary:'Sanitaryware', sink:'Kitchen Sinks', hardware:'Doors & Hardware'
+};
+/* Brand dropdowns per category (edit this list as your catalog changes) */
+const BRANDS = {
+  plumbing:['Sudhakar','Astral'],
+  sink:['Carysil','Anupam','Nirali','Franke'],
+  sanitary:['Jaquar','Hindware','Kohler','CERA','Grohe','Hansgrohe','Astral'],
+  tiles:['Simpolo','Kajaria','Somany'],
+  ewires:['Polycab'],
+  eproducts:['Schneider','Legrand'],
+  epipes:['Precision','VIP'],
+  adhesive:['Roff','MAPEI'],
+  cement:['UltraTech','ACC','Ambuja','Ramco'],
+  steel:['Tata Tiscon','JSW','Vizag'],
+  waterproof:['Dr. Fixit','Fosroc','Sika'],
+  paint:['Asian Paints','Berger','Nerolac'],
+  blocks:[], hardware:[]
+};
+const MAT_STATUSES = ['open','quoted','won','lost','na'];
+const MAT_LABELS = {open:'OPEN — need to win', quoted:'QUOTED — chasing', won:'WON ✓ our order', lost:'LOST to competitor', na:'N/A'};
+const ROLES = ['Owner/Builder','Purchase Manager','Site Supervisor','Site Engineer','Contractor','Architect','Other'];
+/* Activity types — the accountability trail. pts = gamification points */
+const ACTS = {
+  call:       {n:'Call / Follow-up',  icon:'📞', pts:5},
+  sample_req: {n:'Sample requested',  icon:'📦', pts:10},
+  sample_sent:{n:'Sample sent',       icon:'🚚', pts:15},
+  quote:      {n:'Quotation sent',    icon:'📄', pts:25, money:true},
+  order:      {n:'Order WON',         icon:'🏆', pts:100, money:true},
+  invoice:    {n:'Invoice raised',    icon:'🧾', pts:40, money:true},
+  lost:       {n:'Order lost',        icon:'❌', pts:0,  money:true}
+};
+const LEVELS = [[0,'🌱 Rookie'],[100,'🥉 Bronze'],[300,'🥈 Silver'],[700,'🥇 Gold Closer'],[1500,'🏆 Legend']];
+const inr = n => '₹' + (Math.round(+n)||0).toLocaleString('en-IN');
+const waNum = p => { const d=(p||'').replace(/\D/g,''); return d.length===10 ? '91'+d : d; };
+const waLink = (phone,msg) => 'https://wa.me/'+waNum(phone)+'?text='+encodeURIComponent(msg);
+/* Speech-to-text languages (swappable STT adapter — Web Speech now, TwinMind Ear-3 later) */
+const STT_LANGS = [['te-IN','తెలుగు Telugu'],['hi-IN','हिन्दी Hindi'],['en-IN','English (India)']];
+
+/* ============ SECURITY: AES-256 encryption at rest, PIN lock ============ */
+let S=null, META=null, KEY=null;
+const _te=new TextEncoder(), _td=new TextDecoder();
+const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b)));
+const unb64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+async function deriveKey(secret, salt){
+  const km = await crypto.subtle.importKey('raw', _te.encode(secret), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'}, km, {name:'AES-GCM',length:256}, false, ['encrypt','decrypt']);
+}
+async function encObj(obj, key){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, _te.encode(JSON.stringify(obj)));
+  return {iv:b64(iv), ct:b64(ct)};
+}
+async function decObj(pack, key){
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(pack.iv)}, key, unb64(pack.ct));
+  return JSON.parse(_td.decode(pt));
+}
+function save(){
+  refreshAll();
+  if(KEY && S) encObj(S, KEY).then(p=> localStorage.setItem('st_data', JSON.stringify(p)));
+}
+/* ---- auth screens ---- */
+function authBoot(){
+  const box = document.getElementById('authBox');
+  if(!window.crypto || !crypto.subtle){
+    box.innerHTML='<h1>Browser not supported</h1><div class="tag">This browser cannot do secure encryption. Please open this file in Chrome, Edge, Firefox or Safari.</div>';
+    return;
+  }
+  try{ META = JSON.parse(localStorage.getItem('st_meta')||'null'); }catch(e){ META=null; }
+  if(!META) showSetup(); else showUnlock();
+}
+function showSetup(){
+  document.getElementById('authBox').innerHTML =
+  '<h1>Never miss an order.</h1><div class="tag">Every site. Every stage. Every brand decision — tracked. Your data is encrypted on this device; without your PIN it\'s unreadable, even if the phone is lost.</div>'+
+  '<label>Your name</label><input id="a_name" placeholder="e.g. Arpi Jain">'+
+  '<label>Your role on this device</label><select id="a_role"><option value="exec">Marketing Executive — my own sites</option><option value="admin">Owner / Admin — sees & manages everything</option></select>'+
+  '<label>Create a PIN (6+ digits/letters)</label><input id="a_pin" class="pin-input" type="password" autocomplete="new-password">'+
+  '<label>Confirm PIN</label><input id="a_pin2" class="pin-input" type="password" autocomplete="new-password">'+
+  '<div class="auth-err" id="a_err"></div>'+
+  '<button class="btn" style="width:100%" onclick="doSetup()">Set up & open app</button>'+
+  '<div class="lock-note">⚠️ There is no “forgot PIN”. If you lose the PIN, the encrypted data on this device cannot be recovered — that is exactly what keeps competitors out. Write it somewhere safe.</div>';
+}
+async function doSetup(){
+  const name=document.getElementById('a_name').value.trim();
+  const role=document.getElementById('a_role').value;
+  const pin=document.getElementById('a_pin').value, pin2=document.getElementById('a_pin2').value;
+  const err=document.getElementById('a_err');
+  if(!name) return err.textContent='Enter your name';
+  if(pin.length<6) return err.textContent='PIN must be at least 6 characters';
+  if(pin!==pin2) return err.textContent='PINs do not match';
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  KEY = await deriveKey(pin, salt);
+  META = {name, role, salt:b64(salt)};
+  localStorage.setItem('st_meta', JSON.stringify(META));
+  // migrate any old unencrypted data, then destroy the plaintext
+  let old=null; try{ old=JSON.parse(localStorage.getItem('sitetracker_v1')); }catch(e){}
+  S = (old&&old.sites)? old : {settings:{},sites:[]};
+  localStorage.removeItem('sitetracker_v1');
+  S.settings.execName = name;
+  const p = await encObj(S, KEY); localStorage.setItem('st_data', JSON.stringify(p));
+  unlockDone();
+}
+function showUnlock(){
+  document.getElementById('authBox').innerHTML =
+  '<h1>Welcome back, '+esc(META.name.split(' ')[0])+'.</h1><div class="tag">Enter your PIN to decrypt your sites.</div>'+
+  '<input id="a_pin" class="pin-input" type="password" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')doUnlock()">'+
+  '<div class="auth-err" id="a_err"></div>'+
+  '<button class="btn" style="width:100%" onclick="doUnlock()">Unlock</button>'+
+  '<div class="lock-note">Data on this device is AES-256 encrypted. A wrong PIN reveals nothing.</div>';
+  setTimeout(()=>document.getElementById('a_pin').focus(),100);
+}
+async function doUnlock(){
+  const pin=document.getElementById('a_pin').value;
+  const err=document.getElementById('a_err');
+  try{
+    const key = await deriveKey(pin, unb64(META.salt));
+    S = await decObj(JSON.parse(localStorage.getItem('st_data')), key);
+    KEY = key; unlockDone();
+  }catch(e){ err.textContent='Wrong PIN'; document.getElementById('a_pin').value=''; }
+}
+function unlockDone(){
+  document.getElementById('auth').style.display='none';
+  S.settings = S.settings||{}; S.sites = S.sites||[];
+  if(!S.settings.execName) S.settings.execName = META.name;
+  // migrations: 'chemicals' → 'adhesive'; 'electrical' → 'ewires' (electrical split into pipes/wires/products)
+  S.sites.forEach(s=>{
+    if(s.materials && s.materials.chemicals){
+      if(!s.materials.adhesive) s.materials.adhesive = s.materials.chemicals;
+      delete s.materials.chemicals;
+    }
+    if(s.materials && s.materials.electrical){
+      if(!s.materials.ewires) s.materials.ewires = s.materials.electrical;
+      delete s.materials.electrical;
+    }
+  });
+  initMap(); refreshAll();
+  if(!S.sites.length) setTimeout(()=>toast('Tip: open Data tab → “Load sample sites” to see how it works'),800);
+}
+function lockApp(){ KEY=null; S=null; location.reload(); }
+async function changePIN(){
+  const p1 = prompt('New PIN (6+ characters):'); if(p1===null) return;
+  if(p1.length<6) return toast('PIN must be at least 6 characters');
+  const p2 = prompt('Confirm new PIN:'); if(p1!==p2) return toast('PINs do not match');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  KEY = await deriveKey(p1, salt);
+  META.salt = b64(salt); localStorage.setItem('st_meta', JSON.stringify(META));
+  const p = await encObj(S, KEY); localStorage.setItem('st_data', JSON.stringify(p));
+  toast('PIN changed — data re-encrypted');
+}
+const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const today = ()=> new Date().toISOString().slice(0,10);
+const esc = s => (s??'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const stageIdx = k => STAGES.findIndex(s=>s.k===k);
+const fmtD = d => d ? new Date(d+'T00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
+
+/* ================= ALERT ENGINE ================= */
+function siteStatus(site){
+  const idx = stageIdx(site.stage);
+  if(site.stage==='done') return {level:'done', needs:[], upcoming:[], reasons:['Project completed']};
+  const needsNow = (STAGES[idx]?.mats||[]).filter(m=>{
+    const st = site.materials?.[m]?.status || 'open';
+    return st==='open' || st==='quoted';
+  });
+  const next = STAGES[idx+1];
+  const upcoming = (next?.mats||[]).filter(m=>{
+    const st = site.materials?.[m]?.status || 'open';
+    return st==='open' || st==='quoted';
+  });
+  const reasons = [];
+  let overdue=false, soon=false;
+  if(site.nextFollowUp){
+    const diff = (new Date(site.nextFollowUp) - new Date(today()))/86400000;
+    if(diff < 0){ overdue=true; reasons.push('Follow-up OVERDUE ('+fmtD(site.nextFollowUp)+')'); }
+    else if(diff <= 7){ soon=true; }
+  }
+  // stale: no visit in 45 days on an active site
+  const lastVisit = (site.visits||[]).map(v=>v.date).sort().pop();
+  const stale = lastVisit ? (new Date(today())-new Date(lastVisit))/86400000 > 45 : true;
+  if(needsNow.length) reasons.unshift('Needs NOW: '+needsNow.map(m=>MATS[m]).join(', '));
+  if(upcoming.length) reasons.push('Coming up: '+upcoming.map(m=>MATS[m]).join(', '));
+  if(stale && idx>0) reasons.push('No visit logged in 45+ days');
+  let level = 'ok';
+  if(needsNow.length || overdue) level='hot';
+  else if(upcoming.length || soon || (stale && idx>0)) level='warm';
+  return {level, needs:needsNow, upcoming, reasons};
+}
+
+/* ================= NAVIGATION ================= */
+let currentTab='map', filterMode='all', map, markerLayer, miniMap, miniMarker;
+function showTab(t){
+  currentTab=t;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+t).classList.add('active');
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+  document.getElementById('main').classList.toggle('no-scroll', t==='map');
+  if(t==='map'){ setTimeout(()=>{ map.invalidateSize(); },50); }
+  if(t==='sites'){ document.getElementById('siteFilter').value = filterMode==='all'?'all':filterMode; renderSites(); }
+  if(t==='dash') renderDash();
+  if(t==='data') document.getElementById('execName').value = S.settings.execName||'';
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2400);
+}
+
+/* ================= MAP ================= */
+function initMap(){
+  map = L.map('map',{zoomControl:true}).setView([20.5937,78.9629],5);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+  renderMarkers(); fitAllSites();
+}
+function renderMarkers(){
+  if(!markerLayer) return;
+  markerLayer.clearLayers();
+  S.sites.filter(s=>s.lat&&s.lng).forEach(site=>{
+    const st = siteStatus(site);
+    const icon = L.divIcon({className:'', html:'<div class="mk '+st.level+'"></div>', iconSize:[18,18], iconAnchor:[9,9]});
+    const m = L.marker([site.lat, site.lng],{icon}).addTo(markerLayer);
+    const needTxt = st.needs.length? '<div style="color:var(--red);font-weight:700;font-size:12px;margin:3px 0">🔴 '+esc(st.needs.map(x=>MATS[x]).join(', '))+'</div>':'';
+    m.bindPopup('<div class="pname">'+esc(site.name)+'</div><div style="font-size:12px;color:#6b7a8d">'+esc(STAGES[stageIdx(site.stage)]?.n||'')+' · '+(site.flats||'?')+' flats</div>'+needTxt+'<button class="btn small" style="margin-top:6px" onclick="openDetail(\''+site.id+'\')">Open site card →</button>');
+  });
+}
+function fitAllSites(){
+  const pts = S.sites.filter(s=>s.lat&&s.lng).map(s=>[s.lat,s.lng]);
+  if(pts.length) map.fitBounds(pts,{padding:[40,40],maxZoom:14});
+}
+function locateMe(){
+  if(!navigator.geolocation) return toast('GPS not available in this browser');
+  navigator.geolocation.getCurrentPosition(
+    p=>{ map.setView([p.coords.latitude,p.coords.longitude],15); toast('Centred on your location'); },
+    e=>toast('Could not get GPS: '+e.message), {enableHighAccuracy:true,timeout:10000});
+}
+
+/* ================= SITE LIST ================= */
+function renderSites(){
+  const q = (document.getElementById('siteSearch').value||'').toLowerCase();
+  const f = filterMode;
+  // Admin device: filter by which executive created/owns each site
+  const ef = document.getElementById('execFilter');
+  const creators = [...new Set(S.sites.map(s=>s.createdBy).filter(Boolean))];
+  if(META && META.role==='admin' && creators.length>1){
+    const cur = ef.value;
+    ef.style.display='';
+    ef.innerHTML='<option value="">👤 All executives</option>'+creators.map(c=>'<option'+(c===cur?' selected':'')+'>'+esc(c)+'</option>').join('');
+  } else ef.style.display='none';
+  let list = S.sites.map(s=>({s, st:siteStatus(s)}));
+  if(ef.style.display!=='none' && ef.value) list = list.filter(x=>x.s.createdBy===ef.value);
+  if(f==='overdue') list = list.filter(x=> x.s.nextFollowUp && x.s.nextFollowUp < today());
+  else if(f!=='all') list = list.filter(x=>x.st.level===f);
+  if(q) list = list.filter(x=>{
+    const blob = [x.s.name,x.s.builder,x.s.address,(x.s.contacts||[]).map(c=>c.name+' '+c.phone).join(' '),
+      Object.values(x.s.materials||{}).map(m=>(m.brand||'')+' '+(m.competitor||'')).join(' ')].join(' ').toLowerCase();
+    return blob.includes(q);
+  });
+  const rank={hot:0,warm:1,ok:2,done:3};
+  list.sort((a,b)=>{
+    const d = rank[a.st.level]-rank[b.st.level];
+    if(d) return d;
+    return (a.s.nextFollowUp||'9999') < (b.s.nextFollowUp||'9999') ? -1 : 1;
+  });
+  const el = document.getElementById('siteList');
+  if(!list.length){ el.innerHTML='<div class="empty">No sites here yet.<br>Tap <b>➕ Add Site</b> after your next visit — or load sample data from the Data tab to see how it works.</div>'; return; }
+  el.innerHTML = list.map(({s,st})=>{
+    const need = st.needs.length? '<div class="need">🔴 Needs now: '+esc(st.needs.map(m=>MATS[m]).join(', '))+'</div>':'';
+    const fu = s.nextFollowUp? ' · Follow-up '+fmtD(s.nextFollowUp):'';
+    return '<div class="site-item" onclick="openDetail(\''+s.id+'\')">'+
+      '<div class="status-dot '+st.level+'"></div><div class="grow">'+
+      '<div class="name">'+esc(s.name)+'</div>'+
+      '<div class="meta">'+esc(s.builder||'')+' · '+esc(STAGES[stageIdx(s.stage)]?.n||'')+' · '+(s.flats||'?')+' flats'+fu+(META&&META.role==='admin'&&s.createdBy?' · 👤 '+esc(s.createdBy):'')+'</div>'+need+
+      '</div><div class="pill '+st.level+'">'+st.level.toUpperCase()+'</div></div>';
+  }).join('');
+}
+
+/* ================= DASHBOARD ================= */
+function renderDash(){
+  const isAdmin = META && META.role==='admin';
+  const me = S.settings.execName||'';
+  const mon = today().slice(0,7);
+  const stats={hot:0,warm:0,ok:0,done:0}; let flats=0, open=0, won=0, lost=0, overdue=0;
+  const hotList=[], people={}, catRev={}, prefCount={}, lossCount={}, builders={};
+  const P = n => people[n]=people[n]||{pts:0,visits:0,quotes:0,quoteAmt:0,orders:0,orderAmt:0,invAmt:0,sites:0};
+  S.sites.forEach(s=>{
+    const st=siteStatus(s); stats[st.level]++;
+    flats += parseInt(s.flats)||0;
+    if(s.createdBy) P(s.createdBy).sites++;
+    if(s.nextFollowUp && s.nextFollowUp<today()) overdue++;
+    if(st.level==='hot') hotList.push({s,st});
+    (s.visits||[]).forEach(v=>{ const p=P(v.by||'?'); p.visits++; if((v.date||'').slice(0,7)===mon) p.pts+=10; });
+    (s.activities||[]).forEach(a=>{
+      const p=P(a.by||'?'), amt=+a.amount||0;
+      if((a.date||'').slice(0,7)===mon) p.pts += (ACTS[a.type]?.pts||0);
+      if(a.type==='quote'){ p.quotes++; p.quoteAmt+=amt; }
+      if(a.type==='order'){ p.orders++; p.orderAmt+=amt;
+        if(a.cat) catRev[a.cat]=(catRev[a.cat]||0)+amt;
+        const b=s.builder||s.name; builders[b]=(builders[b]||0)+amt; }
+      if(a.type==='invoice') p.invAmt+=amt;
+    });
+    Object.keys(MATS).forEach(m=>{
+      const mt=s.materials?.[m]; if(!mt) return;
+      if(mt.status==='open'||mt.status==='quoted') open++;
+      if(mt.status==='won') won++;
+      if(mt.status==='lost') lost++;
+      if(mt.brand){ (prefCount[m]=prefCount[m]||{})[mt.brand]=(prefCount[m][mt.brand]||0)+1; }
+      if(mt.status==='lost' && mt.competitor){ (lossCount[m]=lossCount[m]||{})[mt.competitor]=(lossCount[m][mt.competitor]||0)+1; }
+    });
+  });
+  const winRate=(won+lost)? Math.round(won/(won+lost)*100):null;
+  const my = people[me]||{pts:0,visits:0,quotes:0,quoteAmt:0,orders:0,orderAmt:0,invAmt:0};
+  /* level + progress */
+  let li=0; LEVELS.forEach((l,i)=>{ if(my.pts>=l[0]) li=i; });
+  const next = LEVELS[li+1];
+  const prog = next? Math.min(100, Math.round((my.pts-LEVELS[li][0])/(next[0]-LEVELS[li][0])*100)) : 100;
+  const hotHtml = hotList.length? hotList.map(({s,st})=>{
+    const c=(s.contacts||[]).find(c=>c.phone);
+    const wa = c? '<button class="btn small" style="background:#25D366" onclick="event.stopPropagation();window.open(\''+waLink(c.phone,'Hi '+c.name+', this is '+me+'. Regarding '+s.name+' — we can supply your '+(st.needs.map(m=>MATS[m]).join(', ')||'material')+' requirement. When can I visit?')+'\',\'_blank\')">💬 WhatsApp '+esc(c.name.split(' ')[0])+'</button>':'';
+    return '<div class="site-item" onclick="openDetail(\''+s.id+'\')"><div class="status-dot hot"></div><div class="grow"><div class="name">'+esc(s.name)+'</div><div class="meta">'+esc(st.reasons.join(' · '))+'</div><div class="row" style="margin-top:6px">'+wa+'</div></div></div>';
+  }).join('') : '<div class="empty">Nothing urgent right now — every current-stage requirement is won or accounted for.</div>';
+  /* ---- executive (gamified) block ---- */
+  let html =
+  '<div class="levelcard"><div class="row"><div class="grow"><div class="muted" style="font-size:11px;font-weight:700">'+esc(me||'You')+' — THIS MONTH</div>'+
+  '<div class="big">'+LEVELS[li][1]+' · '+my.pts+' pts</div>'+
+  (next? '<div class="muted" style="font-size:12px">'+(next[0]-my.pts)+' pts to '+next[1]+' — one won order = +100</div>':'<div class="muted" style="font-size:12px">Top level reached. Defend it.</div>')+
+  '<div class="bar"><div style="width:'+prog+'%"></div></div></div>'+
+  '<div style="text-align:right"><div class="big">'+inr(my.orderAmt)+'</div><div class="muted" style="font-size:11px">ORDERS WON (ALL TIME)</div></div></div></div>'+
+  '<div class="kpis">'+
+    '<div class="kpi hot"><div class="n">'+stats.hot+'</div><div class="l">Hot now</div></div>'+
+    '<div class="kpi hot"><div class="n">'+overdue+'</div><div class="l">Overdue follow-ups</div></div>'+
+    '<div class="kpi warm"><div class="n">'+inr(my.quoteAmt)+'</div><div class="l">My pipeline (quoted)</div></div>'+
+    '<div class="kpi ok"><div class="n">'+(winRate===null?'—':winRate+'%')+'</div><div class="l">Win rate</div></div>'+
+    '<div class="kpi"><div class="n">'+my.visits+'</div><div class="l">My visits</div></div>'+
+    '<div class="kpi"><div class="n">'+open+'</div><div class="l">Open battles</div></div>'+
+  '</div>'+
+  '<div class="card"><div class="row"><h2 class="grow" style="margin:0">🤖 AI morning briefing</h2>'+
+  '<button class="btn small" style="background:#673ab7" onclick="aiBriefing()">✨ Generate</button></div>'+
+  '<div id="aiBrief" style="margin-top:8px;font-size:13px;white-space:pre-wrap;color:var(--ink)">'+(window._brief? esc(window._brief) : '<span class="muted">Tap Generate — AI reads every site and writes your plan for the day.</span>')+'</div></div>'+
+  '<div class="card"><div class="row"><h2 class="grow" style="margin:0">🔴 Approach today — money on the table</h2>'+
+  '<button class="btn small" style="background:#25D366" onclick="shareHotList()">📤 Share list on WhatsApp</button></div><div style="margin-top:8px">'+hotHtml+'</div></div>';
+  /* ---- admin analytics ---- */
+  if(isAdmin){
+    const names = Object.keys(people).filter(n=>n && n!=='?');
+    names.sort((a,b)=>people[b].pts-people[a].pts || people[b].orderAmt-people[a].orderAmt);
+    const lb = names.length? '<table class="lb"><tr><th>Executive</th><th>Pts (mo)</th><th>Sites</th><th>Visits</th><th>Quoted</th><th>Won</th><th>Invoiced</th></tr>'+
+      names.map((n,i)=>{const p=people[n];return '<tr><td>'+(i===0?'🥇 ':i===1?'🥈 ':i===2?'🥉 ':'')+esc(n)+'</td><td><b>'+p.pts+'</b></td><td>'+p.sites+'</td><td>'+p.visits+'</td><td>'+inr(p.quoteAmt)+'</td><td><b>'+inr(p.orderAmt)+'</b></td><td>'+inr(p.invAmt)+'</td></tr>';}).join('')+'</table>'
+      : '<div class="muted">No activity yet. Import your executives\' backups to see the leaderboard.</div>';
+    /* insights */
+    const insights=[];
+    Object.keys(prefCount).forEach(m=>{
+      const e=Object.entries(prefCount[m]); const tot=e.reduce((x,[,c])=>x+c,0);
+      if(tot<2) return;
+      e.sort((a,b)=>b[1]-a[1]);
+      insights.push({n:tot, html:'<div class="insight good">📌 <b>'+Math.round(e[0][1]/tot*100)+'%</b> of '+tot+' sites prefer <b>'+esc(e[0][0])+'</b> for '+MATS[m]+' — stock &amp; push it.</div>'});
+    });
+    Object.keys(lossCount).forEach(m=>{
+      const e=Object.entries(lossCount[m]); const tot=e.reduce((x,[,c])=>x+c,0);
+      if(tot<2) return;
+      e.sort((a,b)=>b[1]-a[1]);
+      insights.push({n:tot, html:'<div class="insight bad">⚠️ <b>'+Math.round(e[0][1]/tot*100)+'%</b> of '+MATS[m]+' losses went to <b>'+esc(e[0][0])+'</b> — consider adding this brand or matching its offer.</div>'});
+    });
+    const cats=Object.entries(catRev).sort((a,b)=>b[1]-a[1]);
+    if(cats.length) insights.unshift({n:999, html:'<div class="insight">💰 Highest order value: <b>'+MATS[cats[0][0]]+'</b> at <b>'+inr(cats[0][1])+'</b>'+(cats[1]?' · then '+MATS[cats[1][0]]+' ('+inr(cats[1][1])+')':'')+'</div>'});
+    const topB=Object.entries(builders).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    if(topB.length) insights.push({n:998, html:'<div class="insight good">🏆 Top builders by orders: '+topB.map(([b,v])=>'<b>'+esc(b)+'</b> ('+inr(v)+')').join(' · ')+' — protect these relationships.</div>'});
+    insights.sort((a,b)=>b.n-a.n);
+    html += '<div class="card"><h2>👥 Team leaderboard (admin)</h2>'+lb+'</div>'+
+      '<div class="card"><h2>🧠 Revenue insights (admin)</h2>'+
+      (insights.length? insights.map(i=>i.html).join('') : '<div class="muted">Insights appear as brand preferences, wins/losses and order values accumulate. Record brands on every site — that\'s what turns into "70% prefer Astral" answers.</div>')+'</div>';
+  }
+  document.getElementById('dashContent').innerHTML = html;
+}
+function shareHotList(){
+  const lines = S.sites.map(s=>({s,st:siteStatus(s)})).filter(x=>x.st.level==='hot')
+    .map(x=>'🔴 '+x.s.name+(x.s.builder?' ('+x.s.builder+')':'')+' — '+x.st.reasons[0]);
+  if(!lines.length) return toast('No hot sites right now');
+  window.open('https://wa.me/?text='+encodeURIComponent('🎯 ACTION LIST — '+fmtD(today())+'\n\n'+lines.join('\n')+'\n\n(SiteTracker)'),'_blank');
+}
+
+/* ================= ADD / EDIT FORM ================= */
+let editingId=null, formLat=null, formLng=null;
+function openAddForm(id){
+  editingId = id||null;
+  const s = id? S.sites.find(x=>x.id===id) : null;
+  formLat = s?.lat||null; formLng = s?.lng||null;
+  showTab('add');
+  const c = s||{};
+  document.getElementById('addFormWrap').innerHTML =
+  '<div class="card"><h2>'+(s?'Edit site':'New site visit — capture everything once')+'</h2>'+
+  '<div class="form-grid">'+
+  '<div><label>Project / site name *</label><input id="f_name" value="'+esc(c.name||'')+'" placeholder="e.g. Shree Heights Phase 2"></div>'+
+  '<div><label>Builder / company</label><input id="f_builder" value="'+esc(c.builder||'')+'" placeholder="e.g. Shree Developers"></div>'+
+  '<div><label>Current stage *</label><select id="f_stage">'+STAGES.map(x=>'<option value="'+x.k+'"'+(c.stage===x.k?' selected':'')+'>'+x.n+'</option>').join('')+'</select></div>'+
+  '<div><label>Expected completion (year)</label><input id="f_end" value="'+esc(c.expectedEnd||'')+'" placeholder="e.g. 2029"></div>'+
+  '<div><label>No. of flats</label><input id="f_flats" type="number" value="'+esc(c.flats||'')+'" placeholder="e.g. 120"></div>'+
+  '<div><label>Towers / floors</label><input id="f_size" value="'+esc(c.sizeDesc||'')+'" placeholder="e.g. 3 towers × G+14"></div>'+
+  '</div>'+
+  '<label>Address / landmark</label><input id="f_addr" value="'+esc(c.address||'')+'" placeholder="Area, road, landmark">'+
+  '<label>Location on map *</label>'+
+  '<div class="row"><button class="btn sec small" onclick="captureGPS()">📍 Capture GPS (stand at site)</button><span class="muted">or tap the map below to drop a pin</span></div>'+
+  '<div class="gps-status" id="gpsStatus">'+(formLat? '✅ Location set: '+formLat.toFixed(5)+', '+formLng.toFixed(5) : '⚠️ No location yet')+'</div>'+
+  '<div id="miniMap"></div>'+
+  '<h3>Key people (this is your continuity insurance)</h3>'+
+  '<div id="contactRows"></div>'+
+  '<button class="btn sec small" onclick="addContactRow()">+ Add person</button>'+
+  '<label>Next follow-up date</label><input id="f_fu" type="date" value="'+esc(c.nextFollowUp||'')+'">'+
+  '<label>Next action</label><input id="f_action" value="'+esc(c.nextAction||'')+'" placeholder="e.g. Take tile samples to PM">'+
+  '<label>Notes</label><textarea id="f_notes" placeholder="Competitor activity, credit terms discussed, gate pass contact…">'+esc(c.notes||'')+'</textarea>'+
+  '<div class="row" style="margin-top:14px"><button class="btn grow" onclick="saveSite()">'+(s?'Save changes':'Save site')+'</button>'+
+  (s?'<button class="btn danger" onclick="deleteSite(\''+s.id+'\')">Delete</button>':'')+'</div></div>';
+  // contacts
+  (c.contacts&&c.contacts.length? c.contacts:[{role:'Purchase Manager',name:'',phone:''}]).forEach(ct=>addContactRow(ct));
+  // mini map
+  setTimeout(()=>{
+    if(miniMap){ miniMap.remove(); miniMap=null; }
+    miniMap = L.map('miniMap').setView(formLat?[formLat,formLng]:(map?map.getCenter():[20.59,78.96]), formLat?15:(map?map.getZoom():5));
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(miniMap);
+    if(formLat) miniMarker = L.marker([formLat,formLng]).addTo(miniMap);
+    miniMap.on('click', e=>{ setFormLoc(e.latlng.lat, e.latlng.lng, 'Pin dropped'); });
+  },60);
+}
+function setFormLoc(lat,lng,how){
+  formLat=lat; formLng=lng;
+  document.getElementById('gpsStatus').innerHTML='✅ '+how+': '+lat.toFixed(5)+', '+lng.toFixed(5);
+  if(miniMarker) miniMarker.setLatLng([lat,lng]); else miniMarker=L.marker([lat,lng]).addTo(miniMap);
+  miniMap.setView([lat,lng],Math.max(miniMap.getZoom(),15));
+}
+let _gpsWatch=null, _gpsBest=null;
+function stopGPSWatch(){ if(_gpsWatch!==null){ navigator.geolocation.clearWatch(_gpsWatch); _gpsWatch=null; } }
+function captureGPS(){
+  if(!navigator.geolocation) return toast('This browser has no location support — tap the map instead');
+  const el=document.getElementById('gpsStatus');
+  stopGPSWatch(); _gpsBest=null;
+  el.textContent='⏳ Searching for GPS signal… (best outdoors or near a window)';
+  const finish=p=>{ stopGPSWatch(); setFormLoc(p.coords.latitude,p.coords.longitude,'GPS captured, accuracy ±'+Math.round(p.coords.accuracy)+'m'); };
+  _gpsWatch = navigator.geolocation.watchPosition(p=>{
+    if(!_gpsBest || p.coords.accuracy < _gpsBest.coords.accuracy) _gpsBest=p;
+    el.textContent='📡 Signal found — accuracy ±'+Math.round(p.coords.accuracy)+'m, improving…';
+    if(p.coords.accuracy <= 25) finish(p); // good enough for a construction site
+  }, e=>{
+    stopGPSWatch();
+    if(e.code===1) el.innerHTML='❌ Location is <b>blocked</b> for this site on this phone.<br>Fix: tap the <b>🔒 / ⚙ icon</b> beside the address bar → <b>Permissions → Location → Allow</b> → reload this page. Also check phone Settings → Apps → Chrome → Permissions → Location.';
+    else if(e.code===2) el.textContent='❌ No signal — you may be deep indoors. Move near a window/outside and retry, or tap the map to drop a pin.';
+    else el.textContent='❌ GPS timed out — weak signal here. Retry outdoors, or tap the map to drop a pin.';
+  }, {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+  setTimeout(()=>{
+    if(_gpsWatch!==null){
+      if(_gpsBest) finish(_gpsBest); // take the best fix we got, even if rough
+      else { stopGPSWatch(); el.textContent='❌ No fix after 20 seconds — tap the map to drop a pin, or retry outdoors.'; }
+    }
+  }, 20000);
+}
+function addContactRow(ct){
+  ct=ct||{role:'Site Supervisor',name:'',phone:''};
+  const d=document.createElement('div'); d.className='row'; d.style.marginBottom='6px';
+  d.innerHTML='<select class="c_role" style="width:34%">'+ROLES.map(r=>'<option'+(r===ct.role?' selected':'')+'>'+r+'</option>').join('')+'</select>'+
+    '<input class="c_name grow" placeholder="Name" value="'+esc(ct.name)+'">'+
+    '<input class="c_phone" style="width:30%" placeholder="Phone" value="'+esc(ct.phone)+'">'+
+    '<button class="btn danger small" onclick="this.parentNode.remove()">✕</button>';
+  document.getElementById('contactRows').appendChild(d);
+}
+function saveSite(){
+  const name = document.getElementById('f_name').value.trim();
+  if(!name) return toast('Site name is required');
+  if(!formLat) return toast('Set the location — GPS or tap the map');
+  const contacts=[...document.querySelectorAll('#contactRows .row')].map(r=>({
+    role:r.querySelector('.c_role').value, name:r.querySelector('.c_name').value.trim(), phone:r.querySelector('.c_phone').value.trim()
+  })).filter(c=>c.name||c.phone);
+  const vals={
+    name, builder:document.getElementById('f_builder').value.trim(),
+    stage:document.getElementById('f_stage').value,
+    expectedEnd:document.getElementById('f_end').value.trim(),
+    flats:document.getElementById('f_flats').value, sizeDesc:document.getElementById('f_size').value.trim(),
+    address:document.getElementById('f_addr').value.trim(),
+    lat:formLat,lng:formLng, contacts,
+    nextFollowUp:document.getElementById('f_fu').value, nextAction:document.getElementById('f_action').value.trim(),
+    notes:document.getElementById('f_notes').value, updatedAt:new Date().toISOString()
+  };
+  if(editingId){
+    Object.assign(S.sites.find(x=>x.id===editingId), vals);
+    save(); toast('Site updated'); openDetail(editingId);
+  } else {
+    const site = Object.assign({id:uid(), createdAt:new Date().toISOString(), createdBy:S.settings.execName||'', materials:{}, visits:[], activities:[]}, vals);
+    // default all materials to open
+    Object.keys(MATS).forEach(m=> site.materials[m]={status:'open',brand:'',competitor:''});
+    S.sites.push(site); save(); toast('Site saved ✓'); openDetail(site.id);
+  }
+  showTab('sites');
+}
+function deleteSite(id){
+  if(!confirm('Delete this site and all its history?')) return;
+  S.sites = S.sites.filter(x=>x.id!==id); save(); closeModal(); showTab('sites'); toast('Deleted');
+}
+
+/* ================= DETAIL ================= */
+function openDetail(id){
+  const s = S.sites.find(x=>x.id===id); if(!s) return;
+  const st = siteStatus(s), idx=stageIdx(s.stage);
+  const acts = s.activities||[];
+  const asum = t => acts.filter(a=>a.type===t).reduce((x,a)=>x+(+a.amount||0),0);
+  // brand-preference pop-ups appear one stage BEFORE the purchase, while it can still be influenced
+  const PREF_RULES = [
+    {at:'mep',      cats:['plumbing','epipes','ewires','adhesive']}, // plastering crossed
+    {at:'floorprep',cats:['tiles','adhesive']},                      // flooring approaching
+    {at:'tiling',   cats:['paint']},                                 // painting approaching
+    {at:'paint',    cats:['sink','sanitary','eproducts']}            // fittings approaching
+  ];
+  const PREF_CATS = [...new Set(PREF_RULES.filter(r=>idx>=stageIdx(r.at)).flatMap(r=>r.cats))]
+    .filter(m=>!(s.materials?.[m]?.brand));
+  const needPrefs = s.stage!=='done' && PREF_CATS.length>0;
+  const box=document.getElementById('modalBox');
+  const keepScroll = box.dataset.site===id ? box.scrollTop : 0; // don't jump to top on field changes
+  box.innerHTML =
+  '<div class="mhead"><div><span class="pill '+st.level+'">'+st.level.toUpperCase()+'</span> <b style="font-size:17px;margin-left:4px">'+esc(s.name)+'</b><div class="muted">'+esc(s.builder||'')+' · '+(s.flats||'?')+' flats · '+esc(s.sizeDesc||'')+'</div></div><button class="close-x" onclick="closeModal()">✕</button></div>'+
+  (st.reasons.length? '<div class="card" style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.35);margin-top:8px">'+st.reasons.map(r=>'<div style="font-size:13px;font-weight:600;margin:2px 0">• '+esc(r)+'</div>').join('')+'</div>':'')+
+  (needPrefs? '<div class="card" style="background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);margin-top:8px"><b style="font-size:13px">📝 Decision time — pick the builder\'s preferred brand (card disappears as you fill it):</b>'+
+    '<div class="mat-grid" style="margin-top:8px">'+PREF_CATS.map(m=>'<div class="mat-cell"><div class="mn">'+MATS[m]+'</div>'+brandSel(id,m,'brand',s.materials?.[m]?.brand||'')+'</div>').join('')+'</div></div>':'')+
+  '<h3>Construction stage — tap to update</h3><div class="stage-track">'+
+  STAGES.map((x,i)=>'<div class="stage-chip '+(i<idx?'past':i===idx?'now':'')+'" onclick="setStage(\''+id+'\',\''+x.k+'\')">'+x.n+'</div>').join('')+'</div>'+
+  matSection(id, s, idx)+
+  '<h3>Key people</h3><div class="card" style="padding:6px 14px">'+
+  ((s.contacts||[]).length? s.contacts.map(c=>'<div class="contact"><div><b>'+esc(c.name)+'</b><div class="muted">'+esc(c.role)+'</div></div><div class="row" style="gap:12px">'+(c.phone?'<a href="tel:'+esc(c.phone)+'">📞 '+esc(c.phone)+'</a><a href="'+waLink(c.phone,'Hi '+c.name+', this is '+(S.settings.execName||'')+'. Regarding '+s.name+(st.needs.length?' — we can supply your '+st.needs.map(m=>MATS[m]).join(', ')+' requirement':'')+'. When can I visit?')+'" target="_blank">💬 WhatsApp</a>':'')+'</div></div>').join(''):'<div class="muted" style="padding:8px 0">No contacts saved — add them, this is what survives staff changes.</div>')+'</div>'+
+  '<h3>Follow-up</h3><div class="card"><div class="row">'+
+  '<div class="grow"><label>Next follow-up</label><input type="date" id="d_fu" value="'+esc(s.nextFollowUp||'')+'" onchange="updField(\''+id+'\',\'nextFollowUp\',this.value)"></div>'+
+  '<div class="grow"><label>Next action</label><input id="d_action" value="'+esc(s.nextAction||'')+'" onchange="updField(\''+id+'\',\'nextAction\',this.value)"></div></div></div>'+
+  '<h3>Project activity — accountability trail</h3><div class="card">'+
+  '<div class="row" style="font-size:13px;font-weight:700"><span class="pill warm">Quoted '+inr(asum('quote'))+'</span><span class="pill ok">Won '+inr(asum('order'))+'</span><span class="pill ok">Invoiced '+inr(asum('invoice'))+'</span><span class="pill done">Lost '+inr(asum('lost'))+'</span></div>'+
+  '<div class="row" style="margin-top:10px">'+
+  '<select id="act_type" style="width:auto" onchange="onActType()">'+Object.keys(ACTS).map(k=>'<option value="'+k+'">'+ACTS[k].icon+' '+ACTS[k].n+'</option>').join('')+'</select>'+
+  '<input id="act_amt" type="number" placeholder="₹ value" style="width:110px;display:none">'+
+  '<select id="act_cat" style="width:auto;display:none"><option value="">Which material?</option>'+Object.keys(MATS).map(m=>'<option value="'+m+'">'+MATS[m]+'</option>').join('')+'</select></div>'+
+  '<input id="act_note" placeholder="Note — e.g. 400 boxes 600×600 tiles quoted to PM" style="margin-top:8px">'+
+  '<button class="btn" style="margin-top:8px;width:100%" onclick="addActivity(\''+id+'\')">+ Add to project record</button></div>'+
+  ((acts.length? acts.slice().reverse().map(a=>'<div class="visit"><div class="vd">'+(ACTS[a.type]?.icon||'•')+' '+esc(ACTS[a.type]?.n||a.type)+(+a.amount?' — <b>'+inr(a.amount)+'</b>':'')+(a.cat?' ('+esc(MATS[a.cat]||a.cat)+')':'')+' · '+fmtD(a.date)+' — '+esc(a.by||'')+'</div>'+(a.notes?'<div class="vn">'+esc(a.notes)+'</div>':'')+'</div>').join(''):'<div class="muted" style="margin-bottom:8px">No activity recorded yet. Every sample, quote and invoice logged here keeps the team accountable.</div>'))+
+  '<h3>Log a visit</h3><div class="card">'+
+  '<textarea id="v_notes" placeholder="Speak or type: stage progress, quantities coming, who you met, competitor activity…"></textarea>'+
+  '<div class="row" style="margin-top:8px"><button class="btn sec small" id="micBtn" onclick="toggleMic()">🎙️ Speak</button>'+
+  '<select id="stt_lang" style="width:auto;flex:0 1 auto" onchange="S.settings.sttLang=this.value;save()">'+STT_LANGS.map(l=>'<option value="'+l[0]+'"'+((S.settings.sttLang||'te-IN')===l[0]?' selected':'')+'>'+l[1]+'</option>').join('')+'</select>'+
+  '<button class="btn small" style="background:#673ab7" onclick="aiParseNote(\''+id+'\')">✨ AI auto-fill</button></div>'+
+  '<div class="muted" style="margin-top:6px">Speak in Telugu/Hindi/English → ✨ AI reads the note and updates stage, brands, competitors &amp; follow-up for you.</div>'+
+  '<div class="row" style="margin-top:8px"><input type="date" id="v_date" value="'+today()+'" style="width:auto"><button class="btn grow" onclick="addVisit(\''+id+'\')">Save visit</button></div></div>'+
+  '<h3>Visit history ('+(s.visits||[]).length+')</h3>'+
+  ((s.visits||[]).slice().reverse().map(v=>'<div class="visit"><div class="vd">'+fmtD(v.date)+' — '+esc(v.by||'unknown')+' <span class="muted">('+esc(STAGES[stageIdx(v.stageAtVisit)]?.n||'')+')</span></div><div class="vn">'+esc(v.notes)+'</div></div>').join('')||'<div class="muted">No visits logged yet.</div>')+
+  (s.notes? '<h3>Site notes</h3><div class="card" style="white-space:pre-wrap;font-size:13px">'+esc(s.notes)+'</div>':'')+
+  '<div class="row" style="margin-top:14px"><button class="btn sec grow" onclick="closeModal();openAddForm(\''+id+'\')">✎ Edit site info</button>'+
+  (s.lat?'<a class="btn" style="text-decoration:none;text-align:center" href="https://www.google.com/maps/dir/?api=1&destination='+s.lat+','+s.lng+'" target="_blank">🧭 Navigate</a>':'')+'</div>';
+  box.dataset.site = id;
+  box.scrollTop = keepScroll;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); });
+function setStage(id,k){
+  const s=S.sites.find(x=>x.id===id); s.stage=k; s.stageUpdatedAt=new Date().toISOString(); save(); openDetail(id);
+  toast('Stage updated — check material alerts');
+}
+/* ---- materials UI: dropdown-driven cards, only relevant categories shown ---- */
+const STATUS_OPTS = {open:'Open — to win', quoted:'Quoted', won:'Won ✓', lost:'Lost', na:'N/A'};
+function brandSel(id,m,field,cur){
+  const list = BRANDS[m]||[];
+  let opts = '<option value="">— '+(field==='brand'?'brand':'competitor')+' —</option>'+
+    list.map(b=>'<option'+(b===cur?' selected':'')+'>'+b+'</option>').join('');
+  if(cur && !list.includes(cur)) opts += '<option selected>'+esc(cur)+'</option>';
+  opts += '<option value="__other">✎ Other…</option>';
+  return '<select onchange="matBrandChange(this,\''+id+'\',\''+m+'\',\''+field+'\')">'+opts+'</select>';
+}
+function matBrandChange(sel,id,m,field){
+  let v = sel.value;
+  if(v==='__other'){ v = (prompt('Brand name:')||'').trim(); if(!v){ sel.value=''; return; } }
+  setMatField(id,m,field,v);
+}
+function setMatField(id,m,field,v){
+  const s=S.sites.find(x=>x.id===id);
+  s.materials[m]=s.materials[m]||{status:'open'};
+  s.materials[m][field]=v;
+  s.updatedAt=new Date().toISOString();
+  save(); openDetail(id);
+}
+function matCell(id,s,m,idx){
+  const mt = s.materials?.[m]||{status:'open'};
+  const nowNeeded = (STAGES[idx]?.mats||[]).includes(m);
+  return '<div class="mat-cell st-'+mt.status+'">'+
+    '<div class="mn">'+MATS[m]+(nowNeeded?' ⏰':'')+'</div>'+
+    '<select style="margin-top:6px" onchange="setMatField(\''+id+'\',\''+m+'\',\'status\',this.value)">'+
+      MAT_STATUSES.map(k=>'<option value="'+k+'"'+(k===mt.status?' selected':'')+'>'+STATUS_OPTS[k]+'</option>').join('')+'</select>'+
+    brandSel(id,m,'brand',mt.brand||'')+
+    ((mt.status==='lost'||mt.status==='quoted')? brandSel(id,m,'competitor',mt.competitor||'') : '')+
+    '</div>';
+}
+function matSection(id,s,idx){
+  const relevant = [...new Set([...(STAGES[idx]?.mats||[]),...(STAGES[idx+1]?.mats||[])])];
+  const others = Object.keys(MATS).filter(m=>!relevant.includes(m));
+  const showAll = !!window._showAllMats;
+  return '<h3>Materials at this stage'+(relevant.length?'':' — none for this stage')+'</h3>'+
+    (relevant.length? '<div class="mat-grid">'+relevant.map(m=>matCell(id,s,m,idx)).join('')+'</div>':'')+
+    '<button class="btn sec small" style="margin-top:8px" onclick="window._showAllMats=!window._showAllMats;openDetail(\''+id+'\')">'+
+    (showAll? '▲ Hide other categories' : '▼ All categories ('+others.length+' more)')+'</button>'+
+    (showAll? '<div class="mat-grid" style="margin-top:8px">'+others.map(m=>matCell(id,s,m,idx)).join('')+'</div>':'');
+}
+function updField(id,f,v){ S.sites.find(x=>x.id===id)[f]=v; save(); }
+function addVisit(id){
+  const s=S.sites.find(x=>x.id===id);
+  const notes=document.getElementById('v_notes').value.trim();
+  if(!notes) return toast('Write a note first — future-you (or your replacement) will thank you');
+  s.visits=s.visits||[];
+  s.visits.push({date:document.getElementById('v_date').value||today(), by:S.settings.execName||'unknown', notes, stageAtVisit:s.stage});
+  save(); toast('Visit logged ✓ +10 pts'); openDetail(id);
+}
+function onActType(){
+  const t = document.getElementById('act_type').value;
+  const money = !!ACTS[t].money;
+  document.getElementById('act_amt').style.display = money? '':'none';
+  document.getElementById('act_cat').style.display = money? '':'none';
+}
+function addActivity(id){
+  const s=S.sites.find(x=>x.id===id);
+  const type=document.getElementById('act_type').value;
+  const amount=document.getElementById('act_amt').value;
+  const cat=document.getElementById('act_cat').value;
+  const notes=document.getElementById('act_note').value.trim();
+  if(ACTS[type].money && !+amount) return toast('Enter the ₹ value');
+  s.activities=s.activities||[];
+  s.activities.push({id:uid(), type, date:today(), by:S.settings.execName||'unknown', amount:+amount||0, cat, notes});
+  // winning/losing an order updates the material battle automatically
+  if(type==='order' && cat && s.materials?.[cat]) s.materials[cat].status='won';
+  if(type==='lost' && cat && s.materials?.[cat]) s.materials[cat].status='lost';
+  save();
+  toast(ACTS[type].pts? '+'+ACTS[type].pts+' pts 🎉' : 'Recorded');
+  openDetail(id);
+}
+
+/* ================= VOICE — swappable STT adapter =================
+   Provider 1 (live): browser Web Speech API — free, supports te-IN/hi-IN/en-IN.
+   Provider 2 (planned): TwinMind Ear-3 via serverless proxy — swap here only. */
+let _rec=null;
+function sttSupported(){ return !!(window.SpeechRecognition||window.webkitSpeechRecognition); }
+function toggleMic(){
+  if(_rec){ _rec.stop(); return; }
+  if(!sttSupported()) return toast('Voice needs Chrome on Android — please type instead');
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  _rec = new SR();
+  _rec.lang = S.settings.sttLang||'te-IN';
+  _rec.continuous = true; _rec.interimResults = false;
+  const ta = document.getElementById('v_notes');
+  _rec.onresult = e=>{
+    for(let i=e.resultIndex;i<e.results.length;i++)
+      if(e.results[i].isFinal) ta.value = (ta.value? ta.value+' ':'') + e.results[i][0].transcript.trim();
+  };
+  _rec.onerror = e=>{ if(e.error!=='no-speech') toast('Mic: '+e.error); };
+  _rec.onend = ()=>{ _rec=null; const b=document.getElementById('micBtn'); if(b){ b.textContent='🎙️ Speak'; b.classList.remove('rec'); } };
+  _rec.start();
+  const b=document.getElementById('micBtn'); b.textContent='⏹ Stop'; b.classList.add('rec');
+}
+
+/* ================= AI (Claude via Netlify serverless proxy — key never in browser) ================= */
+async function aiCall(kind, payload){
+  const r = await fetch('/.netlify/functions/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,payload})});
+  if(!r.ok){
+    if(r.status===404) throw new Error('AI backend not deployed yet (needs the functions folder + API key on Netlify)');
+    throw new Error(await r.text());
+  }
+  return r.json();
+}
+async function aiParseNote(id){
+  const s = S.sites.find(x=>x.id===id);
+  const note = document.getElementById('v_notes').value.trim();
+  if(!note) return toast('Speak or type a note first');
+  if(_rec) _rec.stop();
+  toast('🤖 AI reading your note…');
+  try{
+    const out = await aiCall('parse',{note, today:today(), stage:s.stage,
+      stages:STAGES.map(x=>({key:x.k,name:x.n})), materials:MATS, statuses:MAT_STATUSES});
+    const msgs=[];
+    if(out.stage && out.stage!==s.stage && STAGES.some(x=>x.k===out.stage)){
+      s.stage=out.stage; s.stageUpdatedAt=new Date().toISOString();
+      msgs.push('Stage → '+STAGES[stageIdx(out.stage)].n);
+    }
+    (out.materials||[]).forEach(m=>{
+      if(!MATS[m.cat]) return;
+      s.materials[m.cat]=s.materials[m.cat]||{status:'open'};
+      if(m.status && MAT_STATUSES.includes(m.status)) s.materials[m.cat].status=m.status;
+      if(m.brand) s.materials[m.cat].brand=m.brand;
+      if(m.competitor) s.materials[m.cat].competitor=m.competitor;
+      msgs.push(MATS[m.cat]+(m.status?' → '+m.status:'')+(m.competitor?' (vs '+m.competitor+')':''));
+    });
+    if(out.nextFollowUp && /^\d{4}-\d{2}-\d{2}$/.test(out.nextFollowUp)){ s.nextFollowUp=out.nextFollowUp; msgs.push('Follow-up '+fmtD(out.nextFollowUp)); }
+    if(out.nextAction) s.nextAction=out.nextAction;
+    s.visits=s.visits||[];
+    s.visits.push({date:today(), by:S.settings.execName||'unknown', notes:note+(out.summary?'\n🤖 '+out.summary:''), stageAtVisit:s.stage});
+    save(); openDetail(id);
+    toast(msgs.length? '✨ '+msgs.slice(0,3).join(' · ') : '✨ Visit saved — no field changes detected');
+  }catch(e){ toast('⚠️ '+e.message); }
+}
+async function aiBriefing(){
+  const el=document.getElementById('aiBrief'); el.textContent='🤖 Reading all sites…';
+  try{
+    const sites = S.sites.map(s=>{const st=siteStatus(s); return {name:s.name,builder:s.builder,stage:STAGES[stageIdx(s.stage)]?.n,
+      level:st.level,reasons:st.reasons,followUp:s.nextFollowUp,action:s.nextAction,
+      lastNote:(s.visits||[]).slice(-1)[0]?.notes?.slice(0,200)||''};})
+      .filter(x=>x.level==='hot'||x.level==='warm');
+    if(!sites.length){ el.textContent='Nothing urgent — every requirement is covered. Enjoy the quiet day.'; return; }
+    const out = await aiCall('brief',{sites, name:S.settings.execName, today:today()});
+    window._brief = out.text; el.textContent = out.text;
+  }catch(e){ el.textContent='⚠️ '+e.message; }
+}
+
+/* ================= EXPORT / IMPORT ================= */
+function download(name, text, type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click();
+}
+async function exportJSON(){
+  const pass = prompt('Passphrase for this backup file (the receiver needs it to open the file — share it in person or by call, never in the same email/WhatsApp as the file):');
+  if(pass===null) return;
+  if(pass.length<6) return toast('Passphrase must be 6+ characters');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(pass, salt);
+  const p = await encObj(S, key);
+  download('sitetracker-backup-'+today()+'.stbak', JSON.stringify({fmt:'st-enc1', by:META.name, date:today(), salt:b64(salt), iv:p.iv, ct:p.ct}), 'application/json');
+  toast('Encrypted backup downloaded — useless to anyone without the passphrase');
+}
+function importJSON(inp){
+  const f=inp.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=async ()=>{ try{
+    const d=JSON.parse(r.result);
+    let data;
+    if(d.fmt==='st-enc1'){
+      const pass = prompt('This backup'+(d.by?' from '+d.by:'')+' is encrypted. Enter its passphrase:');
+      if(pass===null) return;
+      try{
+        const key = await deriveKey(pass, unb64(d.salt));
+        data = await decObj({iv:d.iv, ct:d.ct}, key);
+      }catch(e){ return toast('Wrong passphrase'); }
+    } else if(d.sites){
+      data = d; // legacy unencrypted backup
+    } else throw 0;
+    let added=0, updated=0;
+    (data.sites||[]).forEach(ns=>{
+      const ex=S.sites.find(x=>x.id===ns.id);
+      if(!ex){ S.sites.push(ns); added++; }
+      else if((ns.updatedAt||'')>(ex.updatedAt||'')){ Object.assign(ex,ns); updated++; }
+    });
+    save(); toast('Merged: '+added+' new, '+updated+' updated');
+  }catch(e){ toast('Not a valid backup file'); } };
+  r.readAsText(f); inp.value='';
+}
+function exportCSV(){
+  if(!confirm('⚠️ CSV files are NOT encrypted — anyone who gets the file can read it. Only use on a trusted computer for analysis, and delete after use. Continue?')) return;
+  const head=['Site','Builder','Stage','Flats','Size','Address','Lat','Lng','Status','Needs now','Next follow-up','Next action','Contacts','Won materials','Lost materials','Last visit'];
+  const rows=S.sites.map(s=>{
+    const st=siteStatus(s);
+    const won=Object.keys(MATS).filter(m=>s.materials?.[m]?.status==='won').map(m=>MATS[m]+(s.materials[m].brand?' ('+s.materials[m].brand+')':'')).join('; ');
+    const lost=Object.keys(MATS).filter(m=>s.materials?.[m]?.status==='lost').map(m=>MATS[m]+(s.materials[m].competitor?' → '+s.materials[m].competitor:'')).join('; ');
+    return [s.name,s.builder,STAGES[stageIdx(s.stage)]?.n,s.flats,s.sizeDesc,s.address,s.lat,s.lng,st.level,
+      st.needs.map(m=>MATS[m]).join('; '),s.nextFollowUp,s.nextAction,
+      (s.contacts||[]).map(c=>c.role+': '+c.name+' '+c.phone).join('; '),won,lost,
+      (s.visits||[]).map(v=>v.date).sort().pop()||''];
+  });
+  const csv=[head].concat(rows).map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  download('sitetracker-sites-'+today()+'.csv', '﻿'+csv, 'text/csv');
+}
+function wipeAll(){
+  if(!confirm('Delete ALL sites and history? Export a backup first!')) return;
+  if(!confirm('Really sure? This cannot be undone.')) return;
+  S={settings:{execName:S.settings.execName},sites:[]}; save(); toast('All data deleted');
+}
+
+/* ================= SAMPLE DATA ================= */
+function loadSample(){
+  const base = map && map.getZoom()>8 ? map.getCenter() : {lat:17.4401,lng:78.3489};
+  const j=(r)=> (Math.random()-0.5)*r;
+  const past=(d)=>{const t=new Date();t.setDate(t.getDate()-d);return t.toISOString().slice(0,10)};
+  const fut=(d)=>{const t=new Date();t.setDate(t.getDate()+d);return t.toISOString().slice(0,10)};
+  // mats: {cat:[status,brand,competitor]}
+  const mk=(who,name,builder,stage,flats,size,mats,fu,visits,activities)=>{
+    const site={id:uid(),name,builder,stage,flats,sizeDesc:size,address:'',lat:base.lat+j(.14),lng:base.lng+j(.14),
+      contacts:[{role:'Purchase Manager',name:'Sample PM',phone:'98'+Math.floor(10000000+Math.random()*89999999)},{role:'Site Supervisor',name:'Sample Supervisor',phone:'99'+Math.floor(10000000+Math.random()*89999999)}],
+      materials:{},visits:visits||[],activities:activities||[],nextFollowUp:fu||'',nextAction:'',notes:'(sample site — delete anytime)',
+      createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),createdBy:who};
+    Object.keys(MATS).forEach(m=>{
+      const x=mats[m]||['open','',''];
+      site.materials[m]={status:x[0],brand:x[1]||'',competitor:x[2]||''};
+    });
+    return site;
+  };
+  const A=(type,d,by,amount,cat,notes)=>({id:uid(),type,date:d,by,amount:amount||0,cat:cat||'',notes:notes||''});
+  const R='Ravi Kumar', PR='Priya Singh';
+  S.sites.push(
+    mk(R,'Skyline Residency','Skyline Infra','struct',240,'4 towers × G+18',
+      {cement:['won','UltraTech'],steel:['open'],blocks:['quoted']},fut(2),
+      [{date:past(10),by:R,notes:'Slab work tower B. Steel order expected this month — PM asked for TMT rates.',stageAtVisit:'struct'}],
+      [A('quote',past(9),R,1850000,'steel','TMT quote for towers A+B'),A('sample_sent',past(20),R,0,'blocks','AAC block samples to site office')]),
+    mk(R,'Lakeview Towers','Prisha Builders','mep',180,'2 towers × G+22',
+      {ewires:['quoted','Polycab'],epipes:['open','Precision'],plumbing:['open','Astral'],adhesive:['open','MAPEI'],cement:['won','UltraTech'],steel:['lost','','Tata Tiscon'],sanitary:['lost','','Grohe'],sink:['open','Franke']},fut(5),
+      [{date:past(6),by:R,notes:'Conduit laying floors 1-5. Builder prefers Astral for CPVC. Competitor quoting hard on pipes.',stageAtVisit:'mep'}],
+      [A('quote',past(5),R,920000,'ewires','Polycab wiring full quote'),A('order',past(28),R,2400000,'cement','Cement supply contract'),A('lost',past(40),R,1600000,'steel','Lost to Tata dealer on credit terms')]),
+    mk(R,'Sunrise Enclave','Sunrise Constructions','found',96,'1 tower G+12',
+      {cement:['open'],steel:['open'],waterproof:['open','Dr. Fixit']},fut(1),[],
+      [A('sample_req',past(3),R,0,'cement','PM wants OPC 53 sample + rate card')]),
+    mk(PR,'Green Meadows Villas','GM Estates','tiling',64,'64 villas',
+      {tiles:['open','Kajaria'],paint:['open'],plumbing:['won','Astral'],cement:['won','ACC'],steel:['won','JSW'],sanitary:['lost','','Grohe']},past(3),
+      [{date:past(50),by:PR,notes:'Tiling starts in 6-8 weeks. Architect prefers vitrified 800×800 Kajaria.',stageAtVisit:'floorprep'}],
+      [A('order',past(60),PR,1350000,'plumbing','Astral CPVC full villa order'),A('invoice',past(45),PR,1350000,'plumbing','Invoice raised — 30d credit'),A('quote',past(8),PR,2100000,'tiles','Kajaria vitrified quote all villas')]),
+    mk(PR,'Palm County','Palm Group','paint',150,'3 towers × G+10',
+      {paint:['won','Asian Paints'],tiles:['won','Kajaria'],sanitary:['open'],plumbing:['won','Astral'],cement:['won','UltraTech'],steel:['won','JSW'],ewires:['won','Polycab'],eproducts:['open','Schneider'],blocks:['won'],waterproof:['won','Dr. Fixit']},fut(20),
+      [{date:past(15),by:PR,notes:'Painting 60% done. Sanitary selection meeting next month — push before Grohe gets in.',stageAtVisit:'paint'}],
+      [A('order',past(90),PR,3100000,'plumbing','Astral pipes 3 towers'),A('order',past(30),PR,1750000,'paint','Asian Paints full order'),A('invoice',past(20),PR,1750000,'paint','')]),
+    mk(PR,'Heritage Homes','Heritage Devs','done',80,'2 towers × G+8',
+      {cement:['won','ACC'],steel:['won','JSW'],tiles:['won','Somany'],paint:['won','Asian Paints'],sanitary:['won','Jaquar'],sink:['won','Carysil'],blocks:['won'],ewires:['won','Polycab'],eproducts:['won','Legrand'],epipes:['won','VIP'],plumbing:['won','Astral'],waterproof:['won','Dr. Fixit'],hardware:['won']},'',[],
+      [A('order',past(200),PR,2800000,'plumbing','Full project — reference site'),A('invoice',past(150),PR,2800000,'plumbing','')])
+  );
+  save(); fitAllSites(); toast('6 sample sites loaded — check Map and Dashboard!');
+}
+
+/* ================= REFRESH ================= */
+function refreshAll(){
+  const hot = S.sites.filter(s=>siteStatus(s).level==='hot').length;
+  document.getElementById('hotN').textContent=hot;
+  document.getElementById('hotCount').style.display = 'flex';
+  document.getElementById('subTitle').textContent = S.sites.length+' sites tracked';
+  renderMarkers();
+  if(currentTab==='sites') renderSites();
+  if(currentTab==='dash') renderDash();
+}
+authBoot();
+</script>
+</body>
+</html>
