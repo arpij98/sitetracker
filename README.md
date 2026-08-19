@@ -2,11 +2,11 @@
 
 A field-sales intelligence app for building-materials suppliers. Construction projects buy materials in predictable waves over 3–7 years — cement at foundation, pipes at rough-in, tiles at flooring, sanitaryware at fittings. SiteTracker maps every construction site in the territory, models which materials each site needs **at its current stage**, and turns the map red where an order is about to be placed. Open the app in the morning; the pulsating dots are today's revenue.
 
-> Built for a real building-materials business in India, where field notes arrive in Telugu, Hindi, English — or all three in one sentence.
+> Built for a real building-materials business in India, where field notes arrive in Telugu, Hindi, English - whatever the marketing team wants
 
 ## Why it exists
 
-Two failure modes kill distributor revenue: **missed timing** (nobody visited the site the week the purchase manager chose a tile brand) and **lost memory** (the executive who knew the site quit, and the relationship left with them). SiteTracker attacks both: stage-aware alerts for timing, and a structured, per-site record — contacts, brand preferences, visit history, quotations, invoices — that survives any staff change.
+Two failure modes kill distributor revenue: **missed timing** (nobody visited the site the week the purchase manager chose a tile brand) and **lost memory** (the executive who knew the site quit, and the relationship left with them). SiteTracker attacks both: stage-aware alerts for timing, and a structured, per-site record contacts, brand preferences, visit history, quotations, invoices that survives any staff change.
 
 ## Features
 
